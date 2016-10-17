@@ -1,2 +1,2 @@
 # cluster-tools
-Tools for gluu server cluster
+Various system tools to make things more automated
