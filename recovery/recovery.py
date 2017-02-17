@@ -177,17 +177,6 @@ def detach_ip(container_id):
     safe_subprocess_exec("weave detach {}".format(container_id))
 
 
-def httpd_crashed(container_id):
-    """Checks whether httpd process managed by supervisor is crashed or not.
-
-    :param container_id: ID of the container assigned by docker daemon.
-    """
-    out, _, _ = safe_subprocess_exec(
-        "docker exec {} supervisorctl status httpd".format(container_id)
-    )
-    return "RUNNING" not in out
-
-
 def weave_component_ready(name):
     delay = 10
     max_retry = 6
@@ -252,33 +241,14 @@ def recover_containers(node_id, ox_cluster_hostname):
         ))
         add_dns(container["cid"], container["hostname"])
 
-        if container["type"] in ("ldap", "oxauth", "oxtrust",):
+        if container["type"] in ("oxauth", "oxtrust", "oxeleven",):
             add_dns(container["cid"], "{}.weave.local".format(container["type"]))  # noqa
-
-            if container["type"] == "ldap":
-                # introduce delay to wait for a running opendj instance
-                # before restarting other containers
-                logger.info("waiting for ldap server startup; "
-                            "this may take a while ...")
-                time.sleep(20)
 
         # if cluster hostname contains `weave.local` suffix, this extra DNS
         # entry will be added into weavedns; pretty useful for setup which
         # doesn't have resolvable domain name
         if container["type"] == "nginx":
             add_dns(container["cid"], ox_cluster_hostname)
-
-        # currently, only oxauth and oxidp use httpd
-        if container["type"] in ("oxauth", "oxidp"):
-            if httpd_crashed(container["cid"]):
-                # httpd refuses to work if previous shutdown was unclean
-                # a workaround is to remove ``/var/run/apache2/apache2.pid``
-                # before restarting supervisor program
-                cmd = "rm /var/run/apache2/apache2.pid " \
-                      "&& supervisorctl restart httpd"
-                safe_subprocess_exec(
-                    '''docker exec {} sh -c "{}"'''.format(container["cid"], cmd)  # noqa
-                )
 
 
 if __name__ == "__main__":
