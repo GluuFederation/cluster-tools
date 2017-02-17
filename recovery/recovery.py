@@ -24,7 +24,6 @@
 
 import json
 import logging
-import os
 import socket
 import subprocess
 import sys
@@ -32,7 +31,6 @@ import time
 
 
 DATABASE_URI = "/var/lib/gluuengine/db/shared.json"
-DATABASE_URI_COMPAT = "/var/lib/gluu-cluster/db/shared.json"
 RECOVERY_PRIORITY_CHOICES = {
     "ldap": 1,
     "oxauth": 2,
@@ -54,13 +52,14 @@ def load_database():
     """
     data = []
 
-    if not any(map(os.path.exists, [DATABASE_URI, DATABASE_URI_COMPAT])):
-        logger.warn("unable to read {} or {}".format(DATABASE_URI, DATABASE_URI_COMPAT))  # noqa
+    try:
+        with open(DATABASE_URI) as fp:
+            data = json.loads(fp.read())
+    except IOError:
+        logger.warn("unable to read {}".format(DATABASE_URI))
         sys.exit(1)
-
-    with open(DATABASE_URI) as fp:
-        data = json.loads(fp.read())
-    return data
+    else:
+        return data
 
 
 def get_current_cluster():
