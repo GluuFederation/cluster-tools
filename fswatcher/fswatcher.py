@@ -34,7 +34,6 @@ from watchdog.events import PatternMatchingEventHandler
 WATCHED_DIRECTORY = "/opt/idp"
 DOCKER_CERT_DIR = "/opt/gluu/docker/certs"
 DATABASE_URI = "/var/lib/gluuengine/db/shared.json"
-DATABASE_URI_COMPAT = "/var/lib/gluu-cluster/db/shared.json"
 
 logger = logging.getLogger("fswatcher")
 logger.setLevel(logging.INFO)
@@ -96,7 +95,7 @@ class OxidpHandler(PatternMatchingEventHandler):
 
         swarm_config = get_swarm_config()
 
-        for container in self._get_oxidp_containers():
+        for container in get_oxidp_containers():
             logger.info(
                 "found oxidp container with ID {}".format(container["cid"])
             )
@@ -117,22 +116,28 @@ class OxidpHandler(PatternMatchingEventHandler):
                     )
                 )
 
-    def _get_oxidp_containers(self):
-        data = []
 
-        if not any(map(os.path.exists, [DATABASE_URI, DATABASE_URI_COMPAT])):
-            logger.warn("unable to read {} or {}".format(DATABASE_URI, DATABASE_URI_COMPAT))  # noqa
-            return
+def get_oxidp_containers(self):
+    data = load_database()
+    containers = [
+        item for _, item in data["containers"].iteritems()
+        if (item["type"] == "oxidp" and
+            item["state"] in ("SUCCESS", "DISABLED",))
+    ]
+    return containers
 
+
+def load_database():
+    """Loads JSON-based database as Python object.
+    """
+    data = []
+
+    try:
         with open(DATABASE_URI) as fp:
             data = json.loads(fp.read())
-
-        containers = [
-            item for _, item in data["containers"].iteritems()
-            if (item["type"] == "oxidp" and
-                item["state"] in ("SUCCESS", "DISABLED",))
-        ]
-        return containers
+    except IOError:
+        pass
+    return data
 
 
 if __name__ == "__main__":
